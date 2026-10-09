@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#141826" />
+    <meta name="description" content="Guarda una funzione, immagina la sua curva e prova a disegnarla. Poi scopri quanto ci sei andato vicino." />
+    <title>Curva Cieca — Indovina il grafico</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="./" aria-label="Curva Cieca, torna all'inizio"><span class="brand-mark">∿</span><span>curva<span class="brand-light">cieca</span><span class="brand-dot">.</span></span></a>
+      </header>
+
+      <main class="layout">
+        <aside class="challenge-panel">
+          <div class="eyebrow"><span class="eyebrow-line"></span> SFIDA <span id="challengeNumber">01</span> / <span id="challengeTotal">12</span></div>
+          <h1>Prima<br />immagina.<br /><em>Poi disegna.</em></h1>
+          <p class="intro">La formula è tutto quello che hai. Traccia la curva che ti aspetti, poi premi play e guarda quanto ci sei andato vicino.</p>
+
+          <div class="mode-picker" aria-label="Modalità di gioco">
+            <span class="picker-label">COME VUOI GIOCARE?</span>
+            <div class="mode-tabs"><button id="journeyMode" class="mode-tab active" type="button" aria-pressed="true">↗ Percorso</button><button id="practiceMode" class="mode-tab" type="button" aria-pressed="false">◎ Allenamento</button><button id="roomMode" class="mode-tab" type="button" aria-pressed="false">◉ Stanza</button></div>
+            <p id="modeDescription" class="mode-description">Si parte da y = x. Ogni sfida alza l’asticella.</p>
+            <div id="difficultyPicker" class="difficulty-picker" hidden>
+              <button class="difficulty-option" type="button" data-difficulty="FACILE">Facile</button>
+              <button class="difficulty-option" type="button" data-difficulty="MEDIA">Media</button>
+              <button class="difficulty-option" type="button" data-difficulty="DIFFICILE">Difficile</button>
+              <button class="difficulty-option" type="button" data-difficulty="FOLLE">Folle</button>
+            </div>
+          </div>
+
+          <div id="roomPanel" class="room-panel" hidden>
+            <div id="roomEntry">
+              <form id="createRoomForm" class="room-form">
+                <h2>Crea una stanza</h2>
+                <label>Il tuo nome<input id="hostName" name="name" maxlength="24" autocomplete="nickname" required placeholder="Il tuo nome" /></label>
+                <div class="room-setting-grid">
+                  <label>Numero di sfide<input id="createRounds" type="number" min="1" max="30" step="1" value="5" required /></label>
+                  <label>Secondi per sfida<select id="createSeconds"><option>20</option><option>30</option><option selected>45</option><option>60</option><option>90</option></select></label>
+                  <label>Progressione<select id="createMode"><option value="increasing">Crescente</option><option value="constant">Costante</option></select></label>
+                  <div id="createDifficultyWrap" class="room-difficulty-wrap" hidden><span>Difficoltà</span><input id="createDifficulty" type="hidden" value="FACILE" /><div class="room-difficulty-buttons" role="group" aria-label="Difficoltà costante"><button type="button" data-difficulty="FACILE">Facile</button><button type="button" data-difficulty="MEDIA">Media</button><button type="button" data-difficulty="DIFFICILE">Difficile</button><button type="button" data-difficulty="FOLLE">Folle</button></div></div>
+                </div>
+                <label class="check-row"><input id="createRush" type="checkbox" /> Dopo il primo invio, accorcia il timer</label>
+                <label id="createRushSecondsWrap" hidden>Secondi dopo il primo invio<input id="createRushSeconds" type="number" min="3" max="30" value="10" /></label>
+                <button class="room-action" type="submit">Crea stanza ↗</button>
+              </form>
+              <form id="joinRoomForm" class="room-form join-form">
+                <h2>Entra con un codice</h2>
+                <div class="room-setting-grid"><label>Codice<input id="joinCode" maxlength="6" autocapitalize="characters" required placeholder="ABC123" /></label><label>Il tuo nome<input id="joinName" maxlength="24" autocomplete="nickname" required placeholder="Il tuo nome" /></label></div>
+                <button class="room-action secondary" type="submit">Entra nella stanza →</button>
+              </form>
+            </div>
+            <div id="roomActive" hidden>
+              <div class="room-code-row"><span>STANZA <strong id="roomCode"></strong></span><div class="room-code-actions"><button id="copyRoomBtn" class="text-button" type="button">Copia link</button><button id="leaveRoomBtn" class="text-button leave-button" type="button">Esci</button></div></div>
+              <p id="roomMessage" class="room-message"></p>
+              <div id="roomLobbySettings" hidden>
+                <div class="room-setting-grid">
+                  <label>Numero di sfide<input id="roomRounds" type="number" min="1" max="30" step="1" value="5" /></label>
+                  <label>Secondi<select id="roomSeconds"><option>20</option><option>30</option><option>45</option><option>60</option><option>90</option></select></label>
+                  <label>Progressione<select id="roomDifficultyMode"><option value="increasing">Crescente</option><option value="constant">Costante</option></select></label>
+                  <div id="roomDifficultyWrap" class="room-difficulty-wrap" hidden><span>Difficoltà</span><input id="roomDifficulty" type="hidden" value="FACILE" /><div class="room-difficulty-buttons" role="group" aria-label="Difficoltà costante"><button type="button" data-difficulty="FACILE">Facile</button><button type="button" data-difficulty="MEDIA">Media</button><button type="button" data-difficulty="DIFFICILE">Difficile</button><button type="button" data-difficulty="FOLLE">Folle</button></div></div>
+                </div>
+                <label class="check-row"><input id="roomRush" type="checkbox" /> Accorcia il timer al primo invio</label>
+                <label id="roomRushSecondsWrap" hidden>Finestra finale (secondi)<input id="roomRushSeconds" type="number" min="3" max="30" value="10" /></label>
+                <button id="saveRoomBtn" class="text-button" type="button">Salva impostazioni</button>
+              </div>
+              <div id="roomPlayers" class="room-players" aria-live="polite"></div>
+              <button id="startRoomBtn" class="room-action" type="button" hidden>Inizia partita ↗</button>
+            </div>
+            <p id="roomError" class="room-error" role="alert" hidden></p>
+          </div>
+
+          <div class="side-bottom">
+            <div class="progress-heading"><span id="progressTitle">IL TUO PERCORSO</span><span id="progressLabel">01 / 12</span></div>
+            <div id="levelDots" class="level-dots" aria-label="Seleziona una sfida"></div>
+            <div class="micro-tip"><span class="tip-icon">↗</span><span>Puoi disegnare più tratti. Per gli asintoti, lascia uno spazio.</span></div>
+          </div>
+        </aside>
+
+        <section class="play-area" aria-label="Area di gioco">
+          <div class="play-heading">
+            <div><span id="playKicker" class="section-kicker">IL TUO FOGLIO</span><h2 id="playHeading">Come sarà la curva?</h2></div>
+          </div>
+
+          <div id="challengeHud" class="challenge-hud">
+            <div class="hud-round"><span id="roundLabel">SFIDA 1 / 20</span></div>
+            <div id="levelCard" class="level-card">
+              <div class="level-meta"><span id="levelName">La parabola</span><span id="difficulty" class="difficulty">FACILE</span></div>
+              <div id="formula" class="formula" aria-label="Funzione da indovinare"></div>
+              <p id="levelPrompt" class="level-prompt"></p>
+            </div>
+            <div class="hud-clock"><span id="timerText" hidden>45 s</span></div>
+          </div>
+          <div id="timerStrip" class="timer-strip" hidden><div class="timer-track"><div id="timerFill"></div></div></div>
+
+          <div class="graph-frame">
+            <div class="graph-corner graph-corner-tl"></div><div class="graph-corner graph-corner-tr"></div><div class="graph-corner graph-corner-bl"></div><div class="graph-corner graph-corner-br"></div>
+            <div class="graph-top-label"><span>Y</span><span>DISEGNA QUI <span aria-hidden="true">↘</span></span></div>
+            <div id="canvasWrap" class="canvas-wrap">
+              <canvas id="graphCanvas" aria-label="Piano cartesiano. Disegna il grafico con il mouse o con il dito."></canvas>
+              <div id="graphHint" class="graph-hint" aria-hidden="true"><span class="hint-arrow">↘</span><span>Traccia la curva<br />con il dito o il mouse.</span></div>
+              <div id="countdownCard" class="countdown-card" hidden><span>PREPARATI</span><strong id="countdownNumber">3</strong></div>
+              <div id="waitingCard" class="waiting-card" hidden>Disegno inviato · la curva appare quando tutti confermano o allo scadere</div>
+            </div>
+            <div class="graph-bottom-label"><span>−5</span><span>0</span><span>5 <b>X →</b></span></div>
+          </div>
+          <div class="legend"><span><i class="legend-draw"></i> IL TUO SEGNO</span><span><i class="legend-answer"></i> SOLUZIONE</span></div>
+          <div id="drawingControls" class="drawing-controls" hidden>
+            <div class="drawing-controls-head"><strong id="drawingControlsTitle">I disegni della stanza</strong><span>Soluzione in blu</span></div>
+            <div id="archiveRounds" class="archive-rounds" aria-label="Scegli la sfida da rivedere" hidden></div>
+            <div id="drawingToggles" class="drawing-toggles" aria-label="Giocatori visibili"></div>
+            <button id="downloadDrawingBtn" class="download-drawing" type="button" hidden>Scarica immagine PNG ↓</button>
+          </div>
+
+          <div id="scoreCard" class="score-card" aria-live="polite" hidden>
+            <div class="score-label">IL TUO PUNTEGGIO</div>
+            <div class="score-main"><span id="scoreNumber">0</span><span class="score-denominator">/100</span></div>
+            <div id="scoreTitle" class="score-title"></div>
+            <div id="scoreDescription" class="score-description"></div>
+            <div id="scoreBreakdown" class="score-breakdown" hidden></div>
+          </div>
+
+          <div class="controls">
+            <div class="drawing-tools">
+              <button id="undoBtn" class="tool-button" type="button" disabled><span aria-hidden="true">↶</span> Annulla</button>
+              <button id="clearBtn" class="tool-button" type="button" disabled><span aria-hidden="true">⌫</span> Cancella</button>
+              <button id="retryBtn" class="tool-button" type="button" hidden><span aria-hidden="true">↻</span> Riprova</button>
+              <button id="skipBtn" class="tool-button skip-button" type="button">Salta <span aria-hidden="true">→</span></button>
+            </div>
+            <div class="primary-tools">
+              <span id="statusText" class="status-text">01 — DISEGNA LA TUA IPOTESI</span>
+              <button id="playBtn" class="primary-button" type="button" disabled><span class="play-icon" aria-hidden="true">▶</span><span id="playLabel">Scopri la curva</span><span class="button-arrow" aria-hidden="true">↗</span></button>
+              <button id="nextBtn" class="primary-button next-button" type="button" hidden>Prossima sfida <span aria-hidden="true">→</span></button>
+            </div>
+          </div>
+          <details id="explanationPanel" class="explanation-panel" hidden><summary>Come riconoscere questa curva?</summary><p id="explanationText"></p></details>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
