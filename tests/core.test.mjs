@@ -33,6 +33,14 @@ test('zero terms disappear from formulas and every family has a pattern explanat
   }
 });
 
+test('shifted sine formulas use one pair of parentheses', () => {
+  for (let seed = 0; seed < 100; seed++) {
+    const level = levelFromSpec({ difficulty: 'FACILE', family: 3, seed });
+    assert.doesNotMatch(level.formula, /sin\(\(/, level.formula);
+    assert.match(level.formula, /sin\(<i>x<\/i>(?: [−+] [^)]*)?\)/);
+  }
+});
+
 test('a close full drawing beats partial and inaccurate drawings', () => {
   const level = levelFromSpec({ difficulty: 'FACILE', family: 0, seed: 42 }), width = 900, height = 500;
   const curve = targetSamples(level, width, height);

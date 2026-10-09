@@ -45,7 +45,7 @@ const families = {
     },
     ({ pick }) => {
       const a = pick(1, 2, .5), h = pick(-1, 1, 1), k = pick(-1, 1, 1);
-      return title('Onda', 'La curva sale e scende con un ritmo regolare.', `${Y} = ${coefficient(a)}sin(${shifted(X,h)})${plus(k)}`, x => a * Math.sin(x-h)+k);
+      return title('Onda', 'La curva sale e scende con un ritmo regolare.', `${Y} = ${coefficient(a)}sin(${X}${plus(-h)})${plus(k)}`, x => a * Math.sin(x-h)+k);
     },
     ({ pick, sign }) => {
       const a = signed(.1, sign()), k = pick(-1, 1, .5);
