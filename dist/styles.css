@@ -39,3 +39,4 @@
 .topbar{height:56px;padding-top:0;padding-bottom:0}.layout{min-height:calc(100vh - 56px)}
 .room-difficulty-wrap{grid-column:1/-1;color:#aeb8c9;font-size:11px}.room-difficulty-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:6px}.room-difficulty-buttons button{padding:9px 4px;border:1px solid #4d5970;border-radius:7px;background:#0d1421;color:#c2cada;font-size:12px;cursor:pointer}.room-difficulty-buttons button.active{border-color:#dcfa77;background:#dcfa77;color:#172017;font-weight:700}
 .language-button{border:1px solid #586479;border-radius:7px;background:#20283a;color:#f2f4f6;padding:7px 12px;cursor:pointer;font:700 12px 'DM Mono',monospace}.language-button:hover{border-color:#dcfa77}
+.brand-mark{display:block;flex:none;border-radius:0;background:none;transform:none}
