@@ -2,6 +2,8 @@
 
 Un puzzle da browser: guarda una funzione, indovina la **forma** del grafico e disegnala. La risposta si rivela da sinistra a destra. Conta l'intuizione, non uno studio di funzione da esame. Il piano mantiene la stessa scala sui due assi anche quando cambia la dimensione dello schermo; non ci sono controlli di zoom.
 
+L'interfaccia è disponibile in italiano e inglese. Il pulsante **IT/EN** cambia lingua senza interrompere la partita; la scelta resta salvata nel browser.
+
 ## Avvio
 
 Serve Node.js 20 o successivo. Non ci sono dipendenze da installare.

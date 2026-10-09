@@ -197,6 +197,9 @@ test('HTTP server serves the game and rejects unauthenticated room reads', async
     const page = await fetch(base);
     assert.equal(page.status, 200);
     assert.match(await page.text(), /Curva Cieca/);
+    const translations = await fetch(`${base}/i18n.mjs`);
+    assert.equal(translations.status, 200);
+    assert.match(await translations.text(), /englishExplanations/);
     const created = await fetch(`${base}/api/rooms`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: 'Host', settings: { seconds: 20 } }) });
     assert.equal(created.status, 201);

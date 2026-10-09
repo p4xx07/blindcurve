@@ -1,5 +1,6 @@
 import { WORLD, pixelToWorld, worldToPixel, scoreNormalizedDrawing } from './core.mjs';
 import { explanationForSpec, generateSpecs, levelFromSpec } from './generated.mjs';
+import { difficultyNames, englishExplanations, levelText } from './i18n.mjs';
 
 const $ = id => document.getElementById(id);
 const canvas = $('graphCanvas');
@@ -7,6 +8,69 @@ const ctx = canvas.getContext('2d');
 const wrap = $('canvasWrap');
 const difficultyOrder = ['FACILE', 'MEDIA', 'DIFFICILE', 'FOLLE'];
 const random = () => crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296;
+let locale = localStorage.getItem('curvaLocale') || 'it';
+const tr = (italian, english) => locale === 'en' ? english : italian;
+const levelName = level => levelText(level.spec, locale)?.name ?? level.name;
+const levelPrompt = level => levelText(level.spec, locale)?.prompt ?? level.prompt;
+const difficultyName = difficulty => difficultyNames[locale][difficulty];
+const staticTranslations = [
+  ['.challenge-panel h1', 'First<br>imagine.<br><em>Then draw.</em>', 'html'],
+  ['.intro', 'The formula is all you get. Draw the curve you expect, then reveal the answer.', 'text'],
+  ['.picker-label', 'HOW DO YOU WANT TO PLAY?', 'text'],
+  ['#journeyMode', '↗ Journey', 'text'], ['#practiceMode', '◎ Practice', 'text'], ['#roomMode', '◉ Room', 'text'],
+  ['.difficulty-option[data-difficulty=FACILE]', 'Easy', 'text'], ['.difficulty-option[data-difficulty=MEDIA]', 'Medium', 'text'],
+  ['.difficulty-option[data-difficulty=DIFFICILE]', 'Hard', 'text'], ['.difficulty-option[data-difficulty=FOLLE]', 'Wild', 'text'],
+  ['#createRoomForm h2', 'Create a room', 'text'], ['#joinRoomForm h2', 'Join with a code', 'text'],
+  ['#createRoomForm label:has(#hostName)', 'Your name', 'node'], ['#joinRoomForm label:has(#joinName)', 'Your name', 'node'],
+  ['#joinRoomForm label:has(#joinCode)', 'Code', 'node'],
+  ['#createRoomForm label:has(#createRounds)', 'Number of rounds', 'node'],
+  ['#createRoomForm label:has(#createSeconds)', 'Seconds per round', 'node'],
+  ['#createRoomForm label:has(#createMode)', 'Progression', 'node'],
+  ['#roomLobbySettings label:has(#roomRounds)', 'Number of rounds', 'node'],
+  ['#roomLobbySettings label:has(#roomSeconds)', 'Seconds', 'node'],
+  ['#roomLobbySettings label:has(#roomDifficultyMode)', 'Progression', 'node'],
+  ['#createDifficultyWrap>span', 'Difficulty', 'text'], ['#roomDifficultyWrap>span', 'Difficulty', 'text'],
+  ['#createRush', 'Shorten the timer after the first submission', 'parentNode'],
+  ['#roomRush', 'Shorten the timer after the first submission', 'parentNode'],
+  ['#createRoomForm label:has(#createRushSeconds)', 'Seconds after the first submission', 'node'],
+  ['#roomLobbySettings label:has(#roomRushSeconds)', 'Final window (seconds)', 'node'],
+  ['#createRoomForm button[type=submit]', 'Create room ↗', 'text'], ['#joinRoomForm button[type=submit]', 'Join room →', 'text'],
+  ['#saveRoomBtn', 'Save settings', 'text'], ['#leaveRoomBtn', 'Leave', 'text'],
+  ['#copyRoomBtn', 'Copy link', 'text'], ['.micro-tip span:last-child', 'You can draw several strokes. Leave gaps at asymptotes.', 'text'],
+  ['#roomCode', 'ROOM ', 'parentNode'], ['#countdownCard span', 'GET READY', 'text'],
+  ['#waitingCard', 'Drawing sent · the answer appears when everyone submits or time runs out', 'text'],
+  ['.graph-top-label span:last-child', 'DRAW HERE ↘', 'text'],
+  ['.legend span:first-child', 'YOUR DRAWING', 'node'], ['.legend span:last-child', 'ANSWER', 'node'],
+  ['#drawingControls .drawing-controls-head span', 'Answer in blue', 'text'],
+  ['#downloadDrawingBtn', 'Download PNG ↓', 'text'], ['.score-label', 'YOUR SCORE', 'text'],
+  ['#undoBtn', '↶ Undo', 'text'], ['#clearBtn', '⌫ Clear', 'text'], ['#retryBtn', '↻ Try again', 'text'],
+  ['#skipBtn', 'Skip →', 'text'], ['#explanationPanel summary', 'How do you recognize this curve?', 'text'],
+  ['#createMode option[value=increasing]', 'Increasing', 'text'], ['#createMode option[value=constant]', 'Constant', 'text'],
+  ['#roomDifficultyMode option[value=increasing]', 'Increasing', 'text'], ['#roomDifficultyMode option[value=constant]', 'Constant', 'text'],
+  ...['create','room'].flatMap(prefix => ['FACILE','MEDIA','DIFFICILE','FOLLE'].map((difficulty, index) =>
+    [`#${prefix}DifficultyWrap button[data-difficulty=${difficulty}]`, ['Easy','Medium','Hard','Wild'][index], 'text']))
+];
+function applyStaticLanguage() {
+  document.documentElement.lang = locale;
+  document.title = tr('Curva Cieca — Indovina il grafico', 'Curva Cieca — Guess the graph');
+  document.querySelector('meta[name=description]').content = tr('Guarda una funzione, immagina la sua curva e prova a disegnarla. Poi scopri quanto ci sei andato vicino.', 'See a function, imagine its curve, and draw your guess. Then reveal the answer.');
+  $('languageButton').textContent = locale === 'it' ? 'EN' : 'IT';
+  $('languageButton').setAttribute('aria-label', locale === 'it' ? 'Switch to English' : 'Passa all’italiano');
+  $('hostName').placeholder = $('joinName').placeholder = tr('Il tuo nome', 'Your name');
+  canvas.setAttribute('aria-label', tr('Piano cartesiano. Disegna il grafico con il mouse o con il dito.', 'Coordinate plane. Draw the graph with your mouse or finger.'));
+  $('archiveRounds').setAttribute('aria-label', tr('Scegli la sfida da rivedere', 'Choose a round to review'));
+  $('drawingToggles').setAttribute('aria-label', tr('Giocatori visibili', 'Visible players'));
+  for (const [selector, english, kind] of staticTranslations) {
+    const element = document.querySelector(selector);
+    if (!element) continue;
+    const node = kind === 'parentNode' ? [...element.parentNode.childNodes].find(child => child.nodeType === Node.TEXT_NODE && child.textContent.trim())
+      : kind === 'node' ? [...element.childNodes].find(child => child.nodeType === Node.TEXT_NODE && child.textContent.trim()) : null;
+    const target = node ?? element;
+    const property = kind === 'html' ? 'innerHTML' : 'textContent';
+    if (target._italianText === undefined) target._italianText = target[property];
+    target[property] = locale === 'en' ? english : target._italianText;
+  }
+}
 const sillyNames = [
   'gimble', 'zabi', 'geki', 'plofi', 'bimzo', 'wibbi', 'snurli', 'kobu',
   'zompi', 'pibbo', 'fuzli', 'grimbi', 'tibzi', 'moki', 'blorbi', 'niblo',
@@ -54,10 +118,10 @@ function setMode(mode) {
   if (mode !== 'room') $('drawingControls').hidden = true;
   document.querySelector('.side-bottom').hidden = mode === 'room';
   $('modeDescription').textContent = mode === 'journey'
-    ? '20 curve nuove a ogni percorso, da facile a folle.' : mode === 'practice'
-      ? 'Scegli una difficoltà: ogni giro porta curve nuove.'
-      : 'Da 1 a 30 curve, stesso timer, un vincitore.';
-  $('progressTitle').textContent = mode === 'journey' ? 'IL TUO PERCORSO' : 'SFIDE DI QUESTA DIFFICOLTÀ';
+    ? tr('20 curve nuove a ogni percorso, da facile a folle.', '20 new curves each journey, from easy to wild.') : mode === 'practice'
+      ? tr('Scegli una difficoltà: ogni giro porta curve nuove.', 'Pick a difficulty. Every run brings new curves.')
+      : tr('Da 1 a 30 curve, stesso timer, un vincitore.', '1 to 30 curves, one timer, one winner.');
+  $('progressTitle').textContent = mode === 'journey' ? tr('IL TUO PERCORSO', 'YOUR JOURNEY') : tr('SFIDE DI QUESTA DIFFICOLTÀ', 'ROUNDS AT THIS LEVEL');
   document.querySelectorAll('.difficulty-option').forEach(button => {
     const active = button.dataset.difficulty === state.difficulty;
     button.classList.toggle('active', active);
@@ -75,20 +139,20 @@ function setMode(mode) {
     }
     $('challengeHud').hidden = !state.room || state.room.phase === 'lobby';
     $('playBtn').hidden = true; $('nextBtn').hidden = true; $('retryBtn').hidden = true; $('skipBtn').hidden = true;
-    $('playKicker').textContent = 'PARTITA IN STANZA';
-    $('playHeading').textContent = state.room ? 'Aspetta la prossima curva' : 'Crea una stanza o entra';
+    $('playKicker').textContent = tr('PARTITA IN STANZA', 'ROOM MATCH');
+    $('playHeading').textContent = state.room ? tr('Aspetta la prossima curva', 'Waiting for the next curve') : tr('Crea una stanza o entra', 'Create or join a room');
     $('graphHint').classList.remove('hide');
-    $('graphHint').lastElementChild.innerHTML = 'La sfida apparirà qui<br />quando inizia la partita.';
+    $('graphHint').lastElementChild.innerHTML = tr('La sfida apparirà qui<br />quando inizia la partita.', 'The round will appear here<br />when the match starts.');
     updateButtons(); render();
   } else {
     const bands = mode === 'journey' ? difficultyOrder.flatMap(difficulty => Array(5).fill(difficulty))
       : Array(5).fill(state.difficulty);
     state.soloDeck = generateSpecs(bands, random).map(levelFromSpec);
     state.scores = new Map();
-    $('playKicker').textContent = 'IL TUO FOGLIO';
-    $('playHeading').textContent = 'Come sarà la curva?';
+    $('playKicker').textContent = tr('IL TUO FOGLIO', 'YOUR CANVAS');
+    $('playHeading').textContent = tr('Come sarà la curva?', 'What will the curve look like?');
     $('challengeHud').hidden = false;
-    $('graphHint').lastElementChild.innerHTML = 'Traccia la curva<br />con il dito o il mouse.';
+    $('graphHint').lastElementChild.innerHTML = tr('Traccia la curva<br />con il dito o il mouse.', 'Draw the curve<br />with your finger or mouse.');
     selectLevel(indicesForMode()[0]);
   }
 }
@@ -108,12 +172,12 @@ function selectLevel(index, roomLevel = null) {
   $('challengeNumber').textContent = state.mode === 'room' ? formatIndex(state.room?.roundIndex ?? 0) : formatIndex(position);
   $('challengeTotal').textContent = formatIndex(list.length - 1);
   $('progressLabel').textContent = `${formatIndex(position)} / ${formatIndex(list.length - 1)}`;
-  $('roundLabel').textContent = `SFIDA ${position + 1} / ${list.length}`;
-  $('levelName').textContent = level.name;
-  $('difficulty').textContent = level.difficulty;
+  $('roundLabel').textContent = `${tr('SFIDA', 'ROUND')} ${position + 1} / ${list.length}`;
+  $('levelName').textContent = levelName(level);
+  $('difficulty').textContent = difficultyName(level.difficulty);
   $('difficulty').dataset.level = level.difficulty;
   $('formula').innerHTML = level.formula;
-  $('levelPrompt').textContent = 'Indovina la forma: guarda svolte, rami e oscillazioni.';
+  $('levelPrompt').textContent = tr('Indovina la forma: guarda svolte, rami e oscillazioni.', 'Guess the shape: look for turns, branches and waves.');
   $('graphHint').classList.remove('hide');
   $('scoreCard').hidden = true;
   $('drawingControls').hidden = true;
@@ -123,7 +187,7 @@ function selectLevel(index, roomLevel = null) {
   $('nextBtn').hidden = true;
   $('retryBtn').hidden = true;
   $('skipBtn').hidden = state.mode === 'room';
-  $('statusText').textContent = `${formatIndex(position)} — DISEGNA LA TUA IPOTESI`;
+  $('statusText').textContent = `${formatIndex(position)} — ${tr('DISEGNA LA TUA IPOTESI', 'DRAW YOUR GUESS')}`;
   updateButtons();
   if (state.mode !== 'room') renderDots();
   render();
@@ -138,7 +202,7 @@ function renderDots() {
     button.className = 'level-dot';
     if (index === state.levelIndex) button.classList.add('current');
     else if (state.scores.has(index)) button.classList.add('completed');
-    button.title = `${formatIndex(position)} · ${state.soloDeck[index].name}${state.scores.has(index) ? ` · ${state.scores.get(index)}/100` : ''}`;
+    button.title = `${formatIndex(position)} · ${levelName(state.soloDeck[index])}${state.scores.has(index) ? ` · ${state.scores.get(index)}/100` : ''}`;
     button.setAttribute('aria-label', button.title);
     button.addEventListener('click', () => selectLevel(index));
     return button;
@@ -258,7 +322,7 @@ function renderDrawingControls() {
   if (!round || !room || (room.phase === 'finished' && !state.archive)) { $('drawingControls').hidden = true; return; }
   $('drawingControls').hidden = false;
   const finished = room.phase === 'finished';
-  $('drawingControlsTitle').textContent = finished ? 'Rivedi e scarica una sfida' : 'I disegni della stanza';
+  $('drawingControlsTitle').textContent = finished ? tr('Rivedi e scarica una sfida', 'Review and download a round') : tr('I disegni della stanza', 'Room drawings');
   $('archiveRounds').hidden = !finished;
   $('downloadDrawingBtn').hidden = !finished;
   if (finished) {
@@ -266,24 +330,24 @@ function renderDrawingControls() {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = index === state.archiveRoundIndex ? 'active' : '';
-      button.textContent = `Sfida ${index + 1}`;
+      button.textContent = `${tr('Sfida', 'Round')} ${index + 1}`;
       button.setAttribute('aria-pressed', String(index === state.archiveRoundIndex));
       button.addEventListener('click', () => selectArchiveRound(index));
       return button;
     }));
-    $('downloadDrawingBtn').textContent = `Scarica sfida ${state.archiveRoundIndex + 1} · PNG ↓`;
+    $('downloadDrawingBtn').textContent = `${tr('Scarica sfida', 'Download round')} ${state.archiveRoundIndex + 1} · PNG ↓`;
   }
   $('drawingToggles').replaceChildren(...round.drawings.map(player => {
     const label = document.createElement('label'); label.className = 'drawing-toggle';
     label.style.setProperty('--player-color', player.color);
     const input = document.createElement('input'); input.type = 'checkbox'; input.checked = state.visiblePlayers.has(player.id);
-    input.setAttribute('aria-label', `Mostra il disegno di ${player.name}`);
+    input.setAttribute('aria-label', `${tr('Mostra il disegno di', 'Show the drawing by')} ${player.name}`);
     input.addEventListener('change', () => {
       if (input.checked) state.visiblePlayers.add(player.id); else state.visiblePlayers.delete(player.id);
       render();
     });
     const swatch = document.createElement('span'); swatch.className = 'toggle-swatch';
-    const name = document.createElement('span'); name.textContent = `${player.name}${player.id === room.you.id ? ' · tu' : ''}${player.strokes.length ? '' : ' · nessun tratto'}`;
+    const name = document.createElement('span'); name.textContent = `${player.name}${player.id === room.you.id ? tr(' · tu', ' · you') : ''}${player.strokes.length ? '' : tr(' · nessun tratto', ' · no strokes')}`;
     label.append(input, swatch, name);
     return label;
   }));
@@ -296,9 +360,9 @@ function selectArchiveRound(index) {
   state.visiblePlayers = new Set(round.drawings.map(player => player.id));
   state.currentLevel = levelFromSpec(round.levelSpec);
   state.revealed = true; state.revealing = false;
-  $('roundLabel').textContent = `SFIDA ${index + 1} / ${state.room.roundCount}`;
-  $('levelName').textContent = state.currentLevel.name;
-  $('difficulty').textContent = state.currentLevel.difficulty;
+  $('roundLabel').textContent = `${tr('SFIDA', 'ROUND')} ${index + 1} / ${state.room.roundCount}`;
+  $('levelName').textContent = levelName(state.currentLevel);
+  $('difficulty').textContent = difficultyName(state.currentLevel.difficulty);
   $('difficulty').dataset.level = state.currentLevel.difficulty;
   $('formula').innerHTML = state.currentLevel.formula;
   renderDrawingControls();
@@ -345,7 +409,7 @@ function downloadRoundImage() {
   const context = image.getContext('2d');
   context.fillStyle = '#111521'; context.fillRect(0, 0, image.width, image.height);
   context.textAlign = 'left'; context.fillStyle = '#dcfa77'; context.font = '600 22px Space Grotesk, sans-serif';
-  context.fillText(`CURVA CIECA  ·  SFIDA ${state.archiveRoundIndex + 1} / ${state.room.roundCount}  ·  ${level.name.toUpperCase()}`, 78, 60);
+  context.fillText(`CURVA CIECA  ·  ${tr('SFIDA', 'ROUND')} ${state.archiveRoundIndex + 1} / ${state.room.roundCount}  ·  ${levelName(level).toUpperCase()}`, 78, 60);
   context.fillStyle = '#f5f3ed'; context.font = '700 33px Space Grotesk, sans-serif';
   drawWrappedText(context, plainFormula(level.formula), 78, 110, 1044, 40);
   context.fillStyle = '#f7f8f3'; context.fillRect(78, 230, 1044, 844);
@@ -355,7 +419,7 @@ function downloadRoundImage() {
   renderTarget(1000, context, 1000, 800, level);
   context.restore();
   context.fillStyle = '#a9b5c7'; context.font = '500 16px DM Mono, monospace';
-  context.fillText('SOLUZIONE', 80, 1121);
+  context.fillText(tr('SOLUZIONE', 'ANSWER'), 80, 1121);
   context.fillStyle = '#326cff'; context.fillRect(194, 1111, 28, 5);
   let x = 250, y = 1121;
   for (const player of selected) {
@@ -419,7 +483,7 @@ $('playBtn').addEventListener('click', () => {
   if (state.mode === 'room') { submitRoom(); return; }
   if (state.revealing || state.revealed || !state.strokes.length) return;
   state.revealing = true;state.drawing = false;updateButtons();
-  $('statusText').textContent = 'LA CURVA PRENDE FORMA…';
+  $('statusText').textContent = tr('LA CURVA PRENDE FORMA…', 'THE CURVE IS APPEARING…');
   const duration = matchMedia('(prefers-reduced-motion: reduce)').matches ? 250 : 2200;
   const start = performance.now();
   const step = now => {
@@ -432,27 +496,31 @@ $('playBtn').addEventListener('click', () => {
   state.animationId = requestAnimationFrame(step);
 });
 
+function soloVerdict(score) {
+  return score >= 85 ? [tr('Visione matematica', 'Curve nailed'), tr('La curva era già nella tua testa.', 'You had the shape in mind.')]
+    : score >= 65 ? [tr('Ci sei quasi', 'Almost there'), tr('La forma c’è. Qualche tratto ti è sfuggito.', 'The shape is close; a few parts slipped away.')]
+    : score >= 40 ? [tr('Buon intuito', 'Some good instincts'), tr('Hai colto qualcosa: confronta i due tratti.', 'You caught part of it. Compare the two lines.')]
+    : [tr('Riprova a immaginarla', 'Try picturing it again'), tr('Ora guarda dove la formula cambia direzione.', 'Look for where the formula changes direction.')];
+}
+
 function finishReveal() {
   state.revealing = false;state.revealed = true;render();
   const score = scoreNormalizedDrawing(state.currentLevel, state.strokes);
   state.scores.set(state.levelIndex, Math.max(score, state.scores.get(state.levelIndex) || 0));
   $('scoreNumber').textContent = String(score);
-  const verdict = score >= 85 ? ['Visione matematica', 'La curva era già nella tua testa.']
-    : score >= 65 ? ['Ci sei quasi', 'La forma c’è. Qualche tratto ti è sfuggito.']
-    : score >= 40 ? ['Buon intuito', 'Hai colto qualcosa: confronta i due tratti.']
-    : ['Riprova a immaginarla', 'Ora guarda dove la formula cambia direzione.'];
+  const verdict = soloVerdict(score);
   $('scoreTitle').textContent = verdict[0];$('scoreDescription').textContent = verdict[1];
-  $('levelPrompt').textContent = state.currentLevel.prompt;
+  $('levelPrompt').textContent = levelPrompt(state.currentLevel);
   $('scoreBreakdown').hidden = true;
   $('scoreCard').hidden = false;
   showExplanation();
   reactToScore(score);
-  $('statusText').textContent = `RISULTATO · ${score}/100`;
+  $('statusText').textContent = `${tr('RISULTATO', 'RESULT')} · ${score}/100`;
   $('playBtn').hidden = true;$('nextBtn').hidden = false;
   $('retryBtn').hidden = false;
   $('skipBtn').hidden = true;
   $('nextBtn').textContent = state.levelIndex === state.soloDeck.length - 1
-    ? state.mode === 'journey' ? 'Nuovo percorso ↗' : 'Altre curve ↗' : 'Prossima sfida →';
+    ? state.mode === 'journey' ? tr('Nuovo percorso ↗', 'New journey ↗') : tr('Altre curve ↗', 'More curves ↗') : tr('Prossima sfida →', 'Next round →');
   renderDots();
 }
 
@@ -465,7 +533,9 @@ function reactToScore(score) {
 }
 
 function showExplanation() {
-  $('explanationText').textContent = explanationForSpec(state.currentLevel.spec);
+  const spec = state.currentLevel.spec;
+  $('explanationText').textContent = locale === 'en'
+    ? englishExplanations[spec.difficulty][spec.family] : explanationForSpec(spec);
   $('explanationPanel').hidden = false;
 }
 
@@ -489,7 +559,29 @@ document.querySelectorAll('.difficulty-option').forEach(button => button.addEven
 }));
 
 function showRoomError(message) {
-  $('roomError').textContent = message;
+  const englishErrors = {
+    'Accesso alla stanza non valido.': 'Invalid room access.',
+    'Difficoltà non valida.': 'Invalid difficulty.',
+    'Disegno non valido.': 'Invalid drawing.',
+    'Disegno troppo grande.': 'Drawing is too large.',
+    'Hai già confermato il disegno.': 'You already submitted your drawing.',
+    'I disegni si possono scaricare a partita finita.': 'Drawings can be downloaded after the match.',
+    'Il tempo per questa sfida è scaduto.': 'Time is up for this round.',
+    'La finestra finale deve durare da 3 a 30 secondi.': 'The final window must be 3 to 30 seconds.',
+    'La partita è già iniziata.': 'The match has already started.',
+    'La stanza è piena.': 'The room is full.',
+    'Progressione non valida.': 'Invalid progression.',
+    'Punto fuori dal grafico.': 'Point is outside the graph.',
+    'Questo nome è già in uso nella stanza.': 'That name is already in use in this room.',
+    'Scegli 20, 30, 45, 60 o 90 secondi.': 'Choose 20, 30, 45, 60 or 90 seconds.',
+    'Scegli da 1 a 30 sfide.': 'Choose 1 to 30 rounds.',
+    'Scrivi un nome per entrare nella stanza.': 'Enter a name to join the room.',
+    'Solo chi ospita può iniziare.': 'Only the host can start the match.',
+    'Solo chi ospita può modificare la stanza prima di iniziare.': 'Only the host can change room settings before the match.',
+    'Stanza non trovata.': 'Room not found.',
+    'Richiesta non valida.': 'Invalid request.'
+  };
+  $('roomError').textContent = locale === 'en' ? englishErrors[message] ?? message : message;
   $('roomError').hidden = !message;
 }
 
@@ -499,8 +591,8 @@ async function roomRequest(path, method = 'GET', data, token = state.roomSession
     ...(token ? { 'X-Player-Token': token } : {})
   }, body: data ? JSON.stringify(data) : undefined });
   const result = response.headers.get('content-type')?.includes('application/json')
-    ? await response.json() : { error: 'Per giocare in stanza serve il server Node. Avvia con npm start.' };
-  if (!response.ok) throw new Error(result.error || 'Connessione non riuscita.');
+    ? await response.json() : { error: tr('Per giocare in stanza serve il server Node. Avvia con npm start.', 'Room play needs the Node server. Start it with npm start.') };
+  if (!response.ok) throw new Error(result.error || tr('Connessione non riuscita.', 'Connection failed.'));
   return result;
 }
 
@@ -558,14 +650,14 @@ function connectRoom(code, token, snapshot) {
         if (state.roomSession?.code === code && state.roomSession?.token === token) {
           showRoomError(''); applyRoomSnapshot(result.room);
         }
-      } catch { showRoomError('Connessione interrotta. Riconnessione in corso…'); }
+      } catch { showRoomError(tr('Connessione interrotta. Riconnessione in corso…', 'Connection lost. Reconnecting…')); }
       if (state.roomSession?.code === code && state.roomSession?.token === token) state.roomPollTimer = setTimeout(poll, 600);
     };
     state.roomPollTimer = setTimeout(poll, 600);
   } else {
     const source = new EventSource(`/api/rooms/${code}/events?token=${encodeURIComponent(token)}`);
     source.onmessage = event => { showRoomError(''); applyRoomSnapshot(JSON.parse(event.data)); };
-    source.onerror = () => showRoomError('Connessione interrotta. Riconnessione in corso…');
+    source.onerror = () => showRoomError(tr('Connessione interrotta. Riconnessione in corso…', 'Connection lost. Reconnecting…'));
     state.roomEvents = source;
   }
 }
@@ -633,8 +725,8 @@ function renderRoomPlayers(room) {
     name.textContent = `${player.name}${player.isHost ? ' ★' : ''}`;
     if (player.id === room.you.id) name.classList.add('room-player-you');
     const meta = document.createElement('span'); meta.className = 'room-player-meta';
-    meta.textContent = room.phase === 'lobby' ? 'PRONTO' : room.phase === 'drawing'
-      ? player.submitted ? 'INVIATO ✓' : 'DISEGNA…'
+    meta.textContent = room.phase === 'lobby' ? tr('PRONTO', 'READY') : room.phase === 'drawing'
+      ? player.submitted ? tr('INVIATO ✓', 'SENT ✓') : tr('DISEGNA…', 'DRAWING…')
       : room.phase === 'finished' ? `${player.total} PT` : `+${player.result.points} · ${player.total} PT`;
     row.append(rank, swatch, name, meta);
     const before = previous.get(player.id);
@@ -673,29 +765,30 @@ function renderRoomUI() {
   document.body.style.setProperty('--own-color', room.you.color);
   $('roomLobbySettings').hidden = room.phase !== 'lobby' || !room.you.isHost;
   $('startRoomBtn').hidden = !room.you.isHost || !['lobby', 'finished'].includes(room.phase);
-  $('startRoomBtn').textContent = room.phase === 'finished' ? 'Nuova partita ↗' : `Inizia ${room.settings.rounds} ${room.settings.rounds === 1 ? 'sfida' : 'sfide'} ↗`;
+  $('startRoomBtn').textContent = room.phase === 'finished' ? tr('Nuova partita ↗', 'New match ↗')
+    : `${tr('Inizia', 'Start')} ${room.settings.rounds} ${room.settings.rounds === 1 ? tr('sfida', 'round') : tr('sfide', 'rounds')} ↗`;
   $('roomMessage').textContent = room.phase === 'lobby'
-    ? `${room.players.length} ${room.players.length === 1 ? 'giocatore' : 'giocatori'} · ${room.settings.rounds} ${room.settings.rounds === 1 ? 'sfida' : 'sfide'} · ${room.settings.seconds} s per curva · ${room.settings.difficultyMode === 'constant' ? room.settings.difficulty.toLowerCase() + ' costante' : 'difficoltà crescente'}${room.settings.rush ? ` · ${room.settings.rushSeconds} s dopo il primo invio` : ''}`
-    : room.phase === 'drawing' ? `${room.players.filter(player => player.submitted).length}/${room.players.length} disegni inviati · la soluzione appare quando tutti confermano o allo scadere.`
-    : room.phase === 'reveal' ? 'Confronta i tratti. La prossima curva arriva tra pochi secondi.'
-    : `🏆 ${room.players[0]?.name ?? 'Nessuno'} · ${room.players[0]?.total ?? 0} punti. ${room.you.isHost ? 'Puoi avviare una rivincita.' : 'Aspetta una rivincita.'}`;
+    ? `${room.players.length} ${room.players.length === 1 ? tr('giocatore', 'player') : tr('giocatori', 'players')} · ${room.settings.rounds} ${room.settings.rounds === 1 ? tr('sfida', 'round') : tr('sfide', 'rounds')} · ${room.settings.seconds} ${tr('s per curva', 's per curve')} · ${room.settings.difficultyMode === 'constant' ? `${difficultyName(room.settings.difficulty).toLowerCase()} ${tr('costante', 'throughout')}` : tr('difficoltà crescente', 'increasing difficulty')}${room.settings.rush ? ` · ${room.settings.rushSeconds} ${tr('s dopo il primo invio', 's after first submission')}` : ''}`
+    : room.phase === 'drawing' ? `${room.players.filter(player => player.submitted).length}/${room.players.length} ${tr('disegni inviati · la soluzione appare quando tutti confermano o allo scadere.', 'drawings sent · the answer appears when everyone submits or time runs out.')}`
+    : room.phase === 'reveal' ? tr('Confronta i tratti. La prossima curva arriva tra pochi secondi.', 'Compare the drawings. The next curve is coming soon.')
+    : `🏆 ${room.players[0]?.name ?? tr('Nessuno', 'Nobody')} · ${room.players[0]?.total ?? 0} ${tr('punti', 'points')}. ${room.you.isHost ? tr('Puoi avviare una rivincita.', 'You can start a rematch.') : tr('Aspetta una rivincita.', 'Wait for a rematch.')}`;
   if (room.phase === 'lobby') syncLobbySettings(room.settings);
   renderRoomPlayers(room);
   $('challengeHud').hidden = room.phase === 'lobby';
   $('timerStrip').hidden = room.phase !== 'drawing';
   $('timerText').hidden = room.phase !== 'drawing';
-  $('roundLabel').textContent = `SFIDA ${room.phase === 'finished' && state.archive ? state.archiveRoundIndex + 1 : room.roundIndex + 1} / ${room.roundCount}`;
-  $('playHeading').textContent = room.phase === 'lobby' ? 'Aspetta chi ospita' : room.phase === 'finished' ? 'Partita finita!' : 'Come sarà la curva?';
+  $('roundLabel').textContent = `${tr('SFIDA', 'ROUND')} ${room.phase === 'finished' && state.archive ? state.archiveRoundIndex + 1 : room.roundIndex + 1} / ${room.roundCount}`;
+  $('playHeading').textContent = room.phase === 'lobby' ? tr('Aspetta chi ospita', 'Waiting for the host') : room.phase === 'finished' ? tr('Partita finita!', 'Match over!') : tr('Come sarà la curva?', 'What will the curve look like?');
   $('playBtn').hidden = room.phase !== 'drawing' || room.you.submitted || state.roomSubmitting;
   $('nextBtn').hidden = true; $('retryBtn').hidden = true; $('skipBtn').hidden = true;
-  $('playLabel').textContent = 'Conferma disegno';
+  $('playLabel').textContent = tr('Conferma disegno', 'Submit drawing');
   $('waitingCard').hidden = room.phase !== 'drawing' || !room.you.submitted;
-  if (room.phase === 'drawing') $('statusText').textContent = room.you.submitted ? 'DISEGNO INVIATO · ASPETTA' : 'DISEGNA PRIMA CHE SCADA IL TEMPO';
+  if (room.phase === 'drawing') $('statusText').textContent = room.you.submitted ? tr('DISEGNO INVIATO · ASPETTA', 'DRAWING SENT · WAIT') : tr('DISEGNA PRIMA CHE SCADA IL TEMPO', 'DRAW BEFORE TIME RUNS OUT');
   if (room.phase === 'lobby') {
     $('graphHint').classList.remove('hide');
-    $('graphHint').lastElementChild.innerHTML = 'La sfida apparirà qui<br />quando inizia la partita.';
+    $('graphHint').lastElementChild.innerHTML = tr('La sfida apparirà qui<br />quando inizia la partita.', 'The round will appear here<br />when the match starts.');
   }
-  if (room.phase === 'finished') $('statusText').textContent = 'PARTITA COMPLETATA';
+  if (room.phase === 'finished') $('statusText').textContent = tr('PARTITA COMPLETATA', 'MATCH COMPLETE');
   updateButtons();
 }
 
@@ -716,7 +809,7 @@ function applyRoomSnapshot(room) {
     state.roomSubmitting = false;
     state.roomAutoSent = false;
     selectLevel(room.roundIndex, levelFromSpec(room.levelSpec));
-    $('graphHint').lastElementChild.innerHTML = 'Traccia la curva<br />con il dito o il mouse.';
+    $('graphHint').lastElementChild.innerHTML = tr('Traccia la curva<br />con il dito o il mouse.', 'Draw the curve<br />with your finger or mouse.');
   }
   if (room.phase === 'reveal' && previous?.phase !== 'reveal') {
     state.visiblePlayers = new Set(room.roundDrawings.map(player => player.id));
@@ -772,14 +865,14 @@ function showRoomResult(animate = true) {
   const { accuracy, speed, points } = visibleRound()?.drawings?.find(player => player.id === state.room.you.id)?.result ??
     { accuracy: 0, speed: 0, points: 0 };
   $('scoreNumber').textContent = String(accuracy);
-  $('scoreTitle').textContent = accuracy >= 85 ? 'Curva centrata!' : accuracy >= 60 ? 'Buona intuizione' : accuracy >= 30 ? 'Qualche svolta giusta' : 'Curva sfuggita';
-  $('scoreDescription').textContent = state.currentLevel.prompt;
-  $('scoreBreakdown').textContent = `${accuracy} forma + ${speed} velocità = ${points} punti`;
+  $('scoreTitle').textContent = accuracy >= 85 ? tr('Curva centrata!', 'Curve nailed!') : accuracy >= 60 ? tr('Buona intuizione', 'Good intuition') : accuracy >= 30 ? tr('Qualche svolta giusta', 'Some turns matched') : tr('Curva sfuggita', 'Curve missed');
+  $('scoreDescription').textContent = levelPrompt(state.currentLevel);
+  $('scoreBreakdown').textContent = `${accuracy} ${tr('forma', 'shape')} + ${speed} ${tr('velocità', 'speed')} = ${points} ${tr('punti', 'points')}`;
   $('scoreBreakdown').hidden = false;
   $('scoreCard').hidden = false;
   showExplanation();
-  $('levelPrompt').textContent = state.currentLevel.prompt;
-  $('statusText').textContent = `RISULTATO · ${points} PUNTI`;
+  $('levelPrompt').textContent = levelPrompt(state.currentLevel);
+  $('statusText').textContent = `${tr('RISULTATO', 'RESULT')} · ${points} ${tr('PUNTI', 'POINTS')}`;
   if (animate) reactToScore(accuracy);
   updateButtons();
 }
@@ -852,15 +945,66 @@ $('startRoomBtn').addEventListener('click', async () => {
 $('copyRoomBtn').addEventListener('click', async () => {
   const url = new URL(location.href);
   url.searchParams.set('room', state.room.code);
-  try { await navigator.clipboard.writeText(url.toString()); $('copyRoomBtn').textContent = 'Link copiato ✓'; }
-  catch { $('copyRoomBtn').textContent = 'Copia non riuscita'; }
-  setTimeout(() => { $('copyRoomBtn').textContent = 'Copia link'; }, 2200);
+  try { await navigator.clipboard.writeText(url.toString()); $('copyRoomBtn').textContent = tr('Link copiato ✓', 'Link copied ✓'); }
+  catch { $('copyRoomBtn').textContent = tr('Copia non riuscita', 'Copy failed'); }
+  setTimeout(() => { $('copyRoomBtn').textContent = tr('Copia link', 'Copy link'); }, 2200);
 });
 $('leaveRoomBtn').addEventListener('click', () => { leaveRoom(); setMode('journey'); });
+
+function refreshLanguage() {
+  applyStaticLanguage();
+  $('modeDescription').textContent = state.mode === 'journey'
+    ? tr('20 curve nuove a ogni percorso, da facile a folle.', '20 new curves each journey, from easy to wild.')
+    : state.mode === 'practice' ? tr('Scegli una difficoltà: ogni giro porta curve nuove.', 'Pick a difficulty. Every run brings new curves.')
+      : tr('Da 1 a 30 curve, stesso timer, un vincitore.', '1 to 30 curves, one timer, one winner.');
+  $('progressTitle').textContent = state.mode === 'journey' ? tr('IL TUO PERCORSO', 'YOUR JOURNEY') : tr('SFIDE DI QUESTA DIFFICOLTÀ', 'ROUNDS AT THIS LEVEL');
+  $('playKicker').textContent = state.mode === 'room' ? tr('PARTITA IN STANZA', 'ROOM MATCH') : tr('IL TUO FOGLIO', 'YOUR CANVAS');
+  if (state.currentLevel) {
+    $('levelName').textContent = levelName(state.currentLevel);
+    $('difficulty').textContent = difficultyName(state.currentLevel.difficulty);
+    $('levelPrompt').textContent = state.revealed ? levelPrompt(state.currentLevel) : tr('Indovina la forma: guarda svolte, rami e oscillazioni.', 'Guess the shape: look for turns, branches and waves.');
+    if (!state.revealed) $('graphHint').lastElementChild.innerHTML = tr('Traccia la curva<br />con il dito o il mouse.', 'Draw the curve<br />with your finger or mouse.');
+    if (!$('explanationPanel').hidden) showExplanation();
+  }
+  if (state.mode === 'room') {
+    if (state.room) {
+      state.roomBoardSignature = '';
+      renderRoomUI();
+      if (state.revealed && ['reveal', 'finished'].includes(state.room.phase)) {
+        renderDrawingControls();
+        showRoomResult(false);
+      }
+    } else {
+      $('playHeading').textContent = tr('Crea una stanza o entra', 'Create or join a room');
+      $('graphHint').lastElementChild.innerHTML = tr('La sfida apparirà qui<br />quando inizia la partita.', 'The round will appear here<br />when the match starts.');
+    }
+    return;
+  }
+  $('playHeading').textContent = tr('Come sarà la curva?', 'What will the curve look like?');
+  $('roundLabel').textContent = `${tr('SFIDA', 'ROUND')} ${state.levelIndex + 1} / ${state.soloDeck.length}`;
+  $('playLabel').textContent = tr('Scopri la curva', 'Reveal curve');
+  if (state.revealed) {
+    const score = Number($('scoreNumber').textContent);
+    const verdict = soloVerdict(score);
+    $('scoreTitle').textContent = verdict[0]; $('scoreDescription').textContent = verdict[1];
+    $('statusText').textContent = `${tr('RISULTATO', 'RESULT')} · ${score}/100`;
+    $('nextBtn').textContent = state.levelIndex === state.soloDeck.length - 1
+      ? state.mode === 'journey' ? tr('Nuovo percorso ↗', 'New journey ↗') : tr('Altre curve ↗', 'More curves ↗')
+      : tr('Prossima sfida →', 'Next round →');
+  } else $('statusText').textContent = `${formatIndex(state.levelIndex)} — ${tr('DISEGNA LA TUA IPOTESI', 'DRAW YOUR GUESS')}`;
+  renderDots();
+}
+
+$('languageButton').addEventListener('click', () => {
+  locale = locale === 'it' ? 'en' : 'it';
+  localStorage.setItem('curvaLocale', locale);
+  refreshLanguage();
+});
 
 setInterval(tickRoomClock, 100);
 
 new ResizeObserver(resizeCanvas).observe(wrap);
+applyStaticLanguage();
 setMode('journey');
 const roomFromUrl = new URL(location.href).searchParams.get('room')?.toUpperCase();
 if (roomFromUrl) {

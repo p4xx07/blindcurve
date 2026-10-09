@@ -2,6 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { scoreDrawing, targetSamples, worldToPixel } from '../dist/core.mjs';
 import { DIFFICULTIES, explanationForSpec, generateSpecs, levelFromSpec } from '../dist/generated.mjs';
+import { difficultyNames, englishExplanations, levelText } from '../dist/i18n.mjs';
+
+test('every generated family has English labels and an English explanation', () => {
+  for (const difficulty of DIFFICULTIES) for (let family = 0; family < 5; family++) {
+    const spec = { difficulty, family, seed: 42 };
+    assert.ok(difficultyNames.en[difficulty]);
+    assert.ok(levelText(spec, 'en').name.length > 3);
+    assert.ok(levelText(spec, 'en').prompt.length > 8);
+    assert.ok(englishExplanations[difficulty][family].length > 40);
+  }
+});
 
 test('new decks generate varied equations at every difficulty', () => {
   const bands = DIFFICULTIES.flatMap(difficulty => Array(5).fill(difficulty));

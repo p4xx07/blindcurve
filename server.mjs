@@ -12,6 +12,7 @@ const assets = new Map([
   ['/app.js', ['app.js', 'text/javascript; charset=utf-8']],
   ['/core.mjs', ['core.mjs', 'text/javascript; charset=utf-8']],
   ['/generated.mjs', ['generated.mjs', 'text/javascript; charset=utf-8']],
+  ['/i18n.mjs', ['i18n.mjs', 'text/javascript; charset=utf-8']],
   ['/favicon.svg', ['favicon.svg', 'image/svg+xml']]
 ]);
 
