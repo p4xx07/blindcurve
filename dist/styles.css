@@ -13,6 +13,14 @@
 @media(max-width:560px){body.in-room .mode-picker{display:none}.room-panel[data-phase="drawing"] .room-players{display:none}.room-panel[data-phase="drawing"] .leave-button{display:none}.room-panel[data-phase="drawing"]{margin-bottom:9px}.score-card{position:relative;top:auto;right:auto;width:100%;margin-top:9px;box-shadow:none;padding:11px 13px}.score-card .score-main{display:inline-flex;margin:4px 12px 0 0;vertical-align:middle}.score-card .score-title{display:inline-block;vertical-align:middle}.score-card .score-breakdown{font-size:10px}.graph-hint{left:38%;top:31%;font-size:13px}}
 .formula:has(.boss-variables){font-size:16px;line-height:1.75;letter-spacing:0}.boss-variables{display:block;color:#bdcbea;font-size:.72em;margin-bottom:4px}
 @media(max-width:560px){.formula:has(.boss-variables){font-size:14px;line-height:1.65}.boss-variables{font-size:.8em}}
+
+.mode-picker{container-type:inline-size}
+.mode-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}
+.mode-tab{min-width:0}
+@container(max-width:340px){
+  .mode-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mode-tab:last-child{grid-column:1/-1}
+}
 /* Ten horizontal units and eight vertical units occupy equal sized squares. */
 .play-heading,.graph-frame,.controls,.timer-strip,.footer-note{width:100%;max-width:720px;margin-left:auto;margin-right:auto}
 .canvas-wrap{width:100%;height:auto;aspect-ratio:5/4}
