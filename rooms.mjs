@@ -67,7 +67,7 @@ export function validateStrokes(input) {
   });
 }
 
-export function createRoomStore({ now = Date.now, schedule = setTimeout, cancel = clearTimeout,
+export function createRoomStore({ now = Date.now, schedule = setTimeout, cancel = clearTimeout, autoTimers = true,
   random = () => randomBytes(4).readUInt32BE(0) / 4294967296 } = {}) {
   const rooms = new Map();
   const listeners = new Map();
@@ -80,6 +80,7 @@ export function createRoomStore({ now = Date.now, schedule = setTimeout, cancel 
     }
   }
   function timer(room, delay, action) {
+    if (!autoTimers) return;
     cancel(timers.get(room.code));
     const handle = schedule(action, delay);
     handle?.unref?.();
@@ -146,11 +147,11 @@ export function createRoomStore({ now = Date.now, schedule = setTimeout, cancel 
     emit(room);
     return room;
   }
-  function openRound(room) {
+  function openRound(room, at = now()) {
     room.phase = 'drawing';
     room.submissions = new Map();
     room.roundParticipants = room.players.map(({ id, name, color }) => ({ id, name, color }));
-    room.startsAt = now() + 2500;
+    room.startsAt = at + 2500;
     room.deadline = room.originalDeadline = room.startsAt + room.settings.seconds * 1000;
     room.revealedAt = null;
     timer(room, room.deadline - now() + 1000, () => reveal(room));
@@ -187,10 +188,10 @@ export function createRoomStore({ now = Date.now, schedule = setTimeout, cancel 
     else emit(room);
     return room;
   }
-  function reveal(room) {
+  function reveal(room, at = now()) {
     if (room.phase !== 'drawing') return;
     room.phase = 'reveal';
-    room.revealedAt = now();
+    room.revealedAt = at;
     room.history.push({ roundIndex: room.roundIndex, levelSpec: room.deck[room.roundIndex],
       drawings: room.roundParticipants.map(entry => {
         const result = room.submissions.get(entry.id);
@@ -199,9 +200,9 @@ export function createRoomStore({ now = Date.now, schedule = setTimeout, cancel 
       }) });
     for (const entry of room.players) entry.total += room.submissions.get(entry.id)?.points ?? 0;
     emit(room);
-    timer(room, 9000, () => next(room));
+    timer(room, room.revealedAt + 9000 - now(), () => next(room));
   }
-  function next(room) {
+  function next(room, at = now()) {
     if (room.phase !== 'reveal') return;
     if (room.roundIndex === room.deck.length - 1) {
       room.phase = 'finished';
@@ -210,7 +211,27 @@ export function createRoomStore({ now = Date.now, schedule = setTimeout, cancel 
       return;
     }
     room.roundIndex++;
-    openRound(room);
+    openRound(room, at);
+  }
+  function advance(code) {
+    const room = get(code);
+    while (true) {
+      if (room.phase === 'drawing' && now() >= room.deadline + 1000) {
+        reveal(room, room.deadline + 1000);
+      } else if (room.phase === 'reveal' && now() >= room.revealedAt + 9000) {
+        next(room, room.revealedAt + 9000);
+      } else break;
+    }
+    return room;
+  }
+  function snapshot(code) {
+    const room = rooms.get(String(code ?? '').toUpperCase());
+    return room ? { ...room, submissions: [...room.submissions] } : null;
+  }
+  function restore(data) {
+    const room = { ...data, submissions: new Map(data.submissions) };
+    rooms.set(room.code, room);
+    return room;
   }
   function subscribe(code, token, listener) {
     const room = get(code);
@@ -253,5 +274,5 @@ export function createRoomStore({ now = Date.now, schedule = setTimeout, cancel 
       }
     }
   }
-  return { create, join, leave, settings, start, submit, view, archive, subscribe, sweep, get, reveal };
+  return { create, join, leave, settings, start, submit, view, archive, subscribe, sweep, get, reveal, advance, snapshot, restore };
 }

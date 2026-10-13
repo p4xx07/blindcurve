@@ -23,9 +23,19 @@ Apri <http://localhost:4173>. Per usare un'altra porta: `PORT=8080 npm start`.
 
 Ogni disegno riceve fino a 100 punti per somiglianza della curva: contano posizione, direzione, curvatura, svolte e porzione disegnata. Le curve periodiche con picchi richiedono anche i picchi nella posizione giusta: una semplice linea sulla loro base non basta. Un tratto centrale corretto può ottenere un buon punteggio anche senza raggiungere i bordi. Dopo la rivelazione, il pulsante «Come riconoscere questa curva?» spiega il pattern. Nelle stanze si aggiungono fino a 10 punti per la velocità di invio. Un disegno vuoto vale zero. Se il timer scade, il browser invia automaticamente il disegno presente. Si può disegnare con mouse, penna o dito; i tratti separati sono utili per grafici con più rami.
 
-## Pubblicazione su un server
+## Pubblicazione su Vercel
 
-Esegui `npm start` su una macchina raggiungibile e imposta `PORT` secondo la piattaforma. Metti un proxy HTTPS davanti al processo se esponi il sito pubblicamente; il proxy deve lasciare aperte le connessioni `text/event-stream` usate per sincronizzare le stanze. L'app deve usare **un solo processo Node**: stanze, giocatori e punteggi sono in memoria e si azzerano al riavvio. Non servono database né account per questa versione.
+Il repository contiene `vercel.json`: Vercel serve `dist/` come sito statico e usa una Function per le API delle stanze. La Function conserva le partite in Upstash Redis perché richieste diverse possono arrivare a istanze diverse.
+
+1. Collega un database **Upstash Redis** al progetto dalla scheda **Storage** di Vercel. Scegli una regione europea vicina a `fra1`, se disponibile.
+2. Verifica che le variabili `UPSTASH_REDIS_REST_URL` e `UPSTASH_REDIS_REST_TOKEN` siano presenti per **Production** e per gli ambienti di anteprima che vuoi usare. Sono accettate anche `KV_REST_API_URL` e `KV_REST_API_TOKEN`.
+3. Fai un redeploy dopo aver aggiunto le variabili. `/api/health` deve rispondere con `{"ok":true}`; crea una stanza da due browser per verificare lo stato condiviso.
+
+La pagina singola funziona anche se Redis non è ancora collegato; in quel caso la creazione di una stanza mostra un errore di configurazione. Le stanze scadono dopo due ore di inattività. Le richieste di sincronizzazione vengono fatte circa una volta al secondo; valuta i limiti del piano Redis se il gioco viene usato da molti giocatori insieme.
+
+## Pubblicazione su un server Node
+
+Esegui `npm start` su una macchina raggiungibile e imposta `PORT` secondo la piattaforma. Metti un proxy HTTPS davanti al processo se esponi il sito pubblicamente. L'app deve usare **un solo processo Node**: stanze, giocatori e punteggi sono in memoria e si azzerano al riavvio. Non servono database né account per questa versione.
 
 In alternativa:
 

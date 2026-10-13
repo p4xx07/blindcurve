@@ -642,24 +642,17 @@ function connectRoom(code, token, snapshot) {
   history.replaceState(null, '', url);
   setMode('room');
   applyRoomSnapshot(snapshot);
-  if (location.hostname.endsWith('.trycloudflare.com')) {
-    const poll = async () => {
-      if (state.roomSession?.code !== code || state.roomSession?.token !== token) return;
-      try {
-        const result = await roomRequest(`/api/rooms/${code}`, 'GET', undefined, token);
-        if (state.roomSession?.code === code && state.roomSession?.token === token) {
-          showRoomError(''); applyRoomSnapshot(result.room);
-        }
-      } catch { showRoomError(tr('Connessione interrotta. Riconnessione in corso…', 'Connection lost. Reconnecting…')); }
-      if (state.roomSession?.code === code && state.roomSession?.token === token) state.roomPollTimer = setTimeout(poll, 600);
-    };
-    state.roomPollTimer = setTimeout(poll, 600);
-  } else {
-    const source = new EventSource(`/api/rooms/${code}/events?token=${encodeURIComponent(token)}`);
-    source.onmessage = event => { showRoomError(''); applyRoomSnapshot(JSON.parse(event.data)); };
-    source.onerror = () => showRoomError(tr('Connessione interrotta. Riconnessione in corso…', 'Connection lost. Reconnecting…'));
-    state.roomEvents = source;
-  }
+  const poll = async () => {
+    if (state.roomSession?.code !== code || state.roomSession?.token !== token) return;
+    try {
+      const result = await roomRequest(`/api/rooms/${code}`, 'GET', undefined, token);
+      if (state.roomSession?.code === code && state.roomSession?.token === token) {
+        showRoomError(''); applyRoomSnapshot(result.room);
+      }
+    } catch { showRoomError(tr('Connessione interrotta. Riconnessione in corso…', 'Connection lost. Reconnecting…')); }
+    if (state.roomSession?.code === code && state.roomSession?.token === token) state.roomPollTimer = setTimeout(poll, 1000);
+  };
+  state.roomPollTimer = setTimeout(poll, 1000);
 }
 
 function leaveRoom() {
