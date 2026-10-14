@@ -95,7 +95,7 @@ const state = {
   roomEvents: null, roomPollTimer: 0, roomSubmitting: false, roomRoundKey: '', clockOffset: 0,
   roomResultShown: false, roomAutoSent: false, roomBoard: new Map(), roomBoardSignature: '',
   visiblePlayers: new Set(), archiveRoundIndex: 0, archive: null, archiveLoading: false,
-  axisMode: 'numbers'
+  axisMode: 'numbers', activePointerId: null
 };
 
 function setAxisMode(mode) {
@@ -480,16 +480,32 @@ function pointerPoint(event) {
     y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height)) };
 }
 
+function pointerInsideCanvas(event) {
+  const rect = canvas.getBoundingClientRect();
+  return event.clientX >= rect.left && event.clientX <= rect.right &&
+    event.clientY >= rect.top && event.clientY <= rect.bottom;
+}
+
+function stopDrawing(event) {
+  if (event && event.pointerId !== state.activePointerId) return;
+  const pointerId = state.activePointerId;
+  state.drawing = false;
+  state.activePointerId = null;
+  if (pointerId !== null && canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);
+  updateButtons();
+}
+
 canvas.addEventListener('pointerdown', event => {
-  if (state.revealed || state.revealing || (state.mode === 'room' &&
+  if (state.drawing || state.revealed || state.revealing || (state.mode === 'room' &&
     (!state.room || state.room.phase !== 'drawing' || state.room.you.submitted || state.roomSubmitting ||
       Date.now() + state.clockOffset < state.room.startsAt || Date.now() + state.clockOffset >= state.room.deadline))) return;
   event.preventDefault();canvas.setPointerCapture(event.pointerId);
-  state.drawing = true;state.strokes.push([pointerPoint(event)]);
+  state.drawing = true;state.activePointerId = event.pointerId;state.strokes.push([pointerPoint(event)]);
   $('graphHint').classList.add('hide');updateButtons();render();
 });
 canvas.addEventListener('pointermove', event => {
-  if (!state.drawing) return;
+  if (!state.drawing || event.pointerId !== state.activePointerId) return;
+  if (!pointerInsideCanvas(event)) { stopDrawing(event); return; }
   event.preventDefault();
   const stroke = state.strokes.at(-1);
   const point = pointerPoint(event);
@@ -498,9 +514,11 @@ canvas.addEventListener('pointermove', event => {
     stroke.push(point);updateButtons();render();
   }
 });
-function stopDrawing() { state.drawing = false;updateButtons(); }
 canvas.addEventListener('pointerup', stopDrawing);
 canvas.addEventListener('pointercancel', stopDrawing);
+canvas.addEventListener('pointerleave', stopDrawing);
+canvas.addEventListener('lostpointercapture', stopDrawing);
+window.addEventListener('blur', () => stopDrawing());
 
 $('undoBtn').addEventListener('click', () => {
   state.strokes.pop();
