@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { scoreDrawing, targetSamples, worldToPixel } from '../dist/core.mjs';
-import { DIFFICULTIES, explanationForSpec, generateSpecs, levelFromSpec } from '../dist/generated.mjs';
+import { DIFFICULTIES, FAMILIES_PER_DIFFICULTY, explanationForSpec, generateSpecs, levelFromSpec } from '../dist/generated.mjs';
 import { difficultyNames, englishExplanations, levelText } from '../dist/i18n.mjs';
+import { piTicks } from '../dist/axis.mjs';
 
 test('every generated family has English labels and an English explanation', () => {
-  for (const difficulty of DIFFICULTIES) for (let family = 0; family < 5; family++) {
+  for (const difficulty of DIFFICULTIES) for (let family = 0; family < FAMILIES_PER_DIFFICULTY[difficulty]; family++) {
     const spec = { difficulty, family, seed: 42 };
     assert.ok(difficultyNames.en[difficulty]);
     assert.ok(levelText(spec, 'en').name.length > 3);
@@ -25,7 +26,7 @@ test('new decks generate varied equations at every difficulty', () => {
 });
 
 test('zero terms disappear from formulas and every family has a pattern explanation', () => {
-  for (const difficulty of DIFFICULTIES) for (let family = 0; family < 5; family++) for (let seed = 0; seed < 100; seed++) {
+  for (const difficulty of DIFFICULTIES) for (let family = 0; family < FAMILIES_PER_DIFFICULTY[difficulty]; family++) for (let seed = 0; seed < 100; seed++) {
     const spec = { difficulty, family, seed };
     const level = levelFromSpec(spec);
     assert.doesNotMatch(level.formula, /[+−]\s*0(?:,0+)?<i>x<\/i>/, level.formula);
@@ -37,7 +38,42 @@ test('shifted sine formulas use one pair of parentheses', () => {
   for (let seed = 0; seed < 100; seed++) {
     const level = levelFromSpec({ difficulty: 'FACILE', family: 3, seed });
     assert.doesNotMatch(level.formula, /sin\(\(/, level.formula);
-    assert.match(level.formula, /sin\(<i>x<\/i>(?: [−+] [^)]*)?\)/);
+    assert.match(level.formula, /sin\(<i>x<\/i>(?: [−+] (?:π|π\/2))?\)/);
+  }
+});
+
+test('radian ticks sit at the real multiples of pi, without changing the graph range', () => {
+  const ticks = piTicks();
+  assert.deepEqual(ticks.map(tick => tick.label), ['−3π/2', '−π', '−π/2', 'π/2', 'π', '3π/2']);
+  for (let i = 0; i < ticks.length; i++) {
+    const half = i < 3 ? i - 3 : i - 2;
+    assert.ok(Math.abs(ticks[i].x - half * Math.PI / 2) < 1e-12);
+  }
+});
+
+test('new trigonometric families are generated, readable, and score tangent branches fairly', () => {
+  for (const difficulty of DIFFICULTIES) {
+    const family = 5, level = levelFromSpec({ difficulty, family, seed: 42 });
+    assert.match(level.formula, /cos\(/);
+    assert.equal(level.piAxis, true);
+  }
+  for (const difficulty of ['DIFFICILE', 'FOLLE']) {
+    const deck = generateSpecs(Array(FAMILIES_PER_DIFFICULTY[difficulty]).fill(difficulty), () => .37);
+    assert.ok(deck.some(spec => spec.family === 6));
+    assert.ok(deck.some(spec => spec.family === 7));
+    const tangent = levelFromSpec({ difficulty, family: 6, seed: 42 });
+    const arctangent = levelFromSpec({ difficulty, family: 7, seed: 42 });
+    assert.match(tangent.formula, /tan\(/);
+    assert.match(arctangent.formula, /arctan\(/);
+    assert.equal(tangent.piAxis, true);
+    assert.equal(arctangent.piAxis, false);
+    assert.doesNotMatch(arctangent.formula, /arctan\(\(/);
+    assert.ok(tangent.breaks.length >= 1);
+    assert.ok(tangent.breaks.every(x => x > -5 && x < 5));
+    const answer = targetSamples(tangent, 900, 500);
+    const flat = [[worldToPixel(-5, 0, 900, 500), worldToPixel(5, 0, 900, 500)]];
+    assert.ok(scoreDrawing(tangent, [answer], 900, 500) >= 90);
+    assert.ok(scoreDrawing(tangent, flat, 900, 500) <= 15);
   }
 });
 
@@ -68,7 +104,7 @@ test('a correct central sketch of y=x earns about 80 to 85 points, unlike a flat
 });
 
 test('generated variations keep a visible curve', () => {
-  for (const difficulty of DIFFICULTIES) for (let family = 0; family < 5; family++) for (let seed = 0; seed < 100; seed++) {
+  for (const difficulty of DIFFICULTIES) for (let family = 0; family < FAMILIES_PER_DIFFICULTY[difficulty]; family++) for (let seed = 0; seed < 100; seed++) {
     const level = levelFromSpec({ difficulty, family, seed });
     assert.ok(targetSamples(level, 900, 500).length > 50, `${difficulty}/${family}/${seed}`);
   }
@@ -76,7 +112,7 @@ test('generated variations keep a visible curve', () => {
 
 test('covering the graph with many lines cannot earn a strong score', () => {
   const grid = Array.from({ length: 11 }, (_, i) => [{ x: 0, y: i * 50 }, { x: 900, y: i * 50 }]);
-  for (const difficulty of DIFFICULTIES) for (let family = 0; family < 5; family++) {
+  for (const difficulty of DIFFICULTIES) for (let family = 0; family < FAMILIES_PER_DIFFICULTY[difficulty]; family++) {
     const level = levelFromSpec({ difficulty, family, seed: 42 });
     assert.ok(scoreDrawing(level, grid, 900, 500) < 45, level.name);
   }
@@ -115,7 +151,7 @@ test('loops, jagged lines, scribbles and half a parabola cannot score as a plaus
 
 test('small drawing wobble keeps a good score across generated shapes', () => {
   const width = 900, height = 500;
-  for (const difficulty of DIFFICULTIES) for (let family = 0; family < 5; family++) {
+  for (const difficulty of DIFFICULTIES) for (let family = 0; family < FAMILIES_PER_DIFFICULTY[difficulty]; family++) {
     const level = levelFromSpec({ difficulty, family, seed: 42 });
     const curve = targetSamples(level, width, height);
     const sketch = curve.map((point, i) => ({ ...point, y: point.y + 8 * Math.sin(i * .28) }));
@@ -124,10 +160,10 @@ test('small drawing wobble keeps a good score across generated shapes', () => {
 });
 
 test('easy and medium formulas use readable templates without combined hard patterns', () => {
-  for (let seed = 0; seed < 100; seed++) for (let family = 0; family < 5; family++) {
+  for (let seed = 0; seed < 100; seed++) for (let family = 0; family < FAMILIES_PER_DIFFICULTY.FACILE; family++) {
     const easy = levelFromSpec({ difficulty: 'FACILE', family, seed });
     const medium = levelFromSpec({ difficulty: 'MEDIA', family, seed });
-    assert.doesNotMatch(easy.formula.replace(/<[^>]+>/g, ''), /e−|\/|sin\([^)]*sin\(/, easy.formula);
+    assert.doesNotMatch(easy.formula.replace(/<[^>]+>/g, ''), /e−|\s\/\s|sin\([^)]*sin\(/, easy.formula);
     assert.doesNotMatch(medium.formula.replace(/<[^>]+>/g, ''), /e−|mod\(|sin\([^)]*sin\(/, medium.formula);
   }
 });
@@ -143,7 +179,8 @@ test('a flat line and random teeth do not score against periodic spikes', () => 
   const width = 900, height = 500;
   const level = {
     fn: x => { const u = ((x + .7) % 1.6 + 1.6) % 1.6; return -2.8 + 5.5 / (1 + 27 * u) + .3 * Math.sin(18 * Math.PI * u); },
-    breaks: Array.from({ length: 16 }, (_, i) => (i - 8) * 1.6 - .7).filter(x => x > -5 && x < 5)
+    breaks: Array.from({ length: 16 }, (_, i) => (i - 8) * 1.6 - .7).filter(x => x > -5 && x < 5),
+    spikeScoring: true
   };
   const stroke = points => points.map(([x, y]) => worldToPixel(x, y, width, height));
   const flat = stroke([[-5, -2.5], [5, -2.5]]);

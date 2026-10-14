@@ -1,6 +1,7 @@
 import { WORLD, pixelToWorld, worldToPixel, scoreNormalizedDrawing } from './core.mjs';
 import { explanationForSpec, generateSpecs, levelFromSpec } from './generated.mjs';
 import { difficultyNames, englishExplanations, levelText } from './i18n.mjs';
+import { piTicks } from './axis.mjs';
 
 const $ = id => document.getElementById(id);
 const canvas = $('graphCanvas');
@@ -93,8 +94,24 @@ const state = {
   scores: new Map(), soloDeck: [], currentLevel: null, animationId: 0, roomSession: null, room: null,
   roomEvents: null, roomPollTimer: 0, roomSubmitting: false, roomRoundKey: '', clockOffset: 0,
   roomResultShown: false, roomAutoSent: false, roomBoard: new Map(), roomBoardSignature: '',
-  visiblePlayers: new Set(), archiveRoundIndex: 0, archive: null, archiveLoading: false
+  visiblePlayers: new Set(), archiveRoundIndex: 0, archive: null, archiveLoading: false,
+  axisMode: 'numbers'
 };
+
+function setAxisMode(mode) {
+  state.axisMode = mode;
+  const button = $('axisModeButton');
+  button.textContent = mode === 'pi' ? 'X: π' : tr('X: numeri', 'X: numbers');
+  button.setAttribute('aria-pressed', String(mode === 'pi'));
+  button.setAttribute('aria-label', mode === 'pi'
+    ? tr('Asse X in radianti. Passa ai numeri.', 'X axis in radians. Switch to numbers.')
+    : tr('Asse X con numeri. Passa ai radianti.', 'X axis with numbers. Switch to radians.'));
+  render();
+}
+
+function defaultAxisMode(level) {
+  return level?.piAxis ? 'pi' : 'numbers';
+}
 
 function indicesForMode() {
   return state.soloDeck.map((_, i) => i);
@@ -167,6 +184,7 @@ function selectLevel(index, roomLevel = null) {
   state.revealX = 0;
   const level = roomLevel ?? state.soloDeck[index];
   state.currentLevel = level;
+  setAxisMode(defaultAxisMode(level));
   const list = state.mode === 'room' ? Array.from({ length: state.room?.roundCount ?? 5 }, (_, i) => i) : indicesForMode();
   const position = list.indexOf(index);
   $('challengeNumber').textContent = state.mode === 'room' ? formatIndex(state.room?.roundIndex ?? 0) : formatIndex(position);
@@ -237,9 +255,18 @@ function gridLine(context, x1, y1, x2, y2, color, lineWidth = 1) {
 
 function renderGrid(context = ctx, width = state.width, height = state.height) {
   context.fillStyle = '#f7f8f3';context.fillRect(0, 0, width, height);
-  for (let x = WORLD.xmin; x <= WORLD.xmax; x += .5) {
-    const px = worldToPixel(x, 0, width, height).x;
-    gridLine(context, px, 0, px, height, Number.isInteger(x) ? '#dce3e5' : '#e9edef');
+  if (state.axisMode === 'pi') {
+    for (let quarter = -6; quarter <= 6; quarter++) {
+      const x = quarter * Math.PI / 4;
+      if (x <= WORLD.xmin || x >= WORLD.xmax) continue;
+      const px = worldToPixel(x, 0, width, height).x;
+      gridLine(context, px, 0, px, height, quarter % 2 === 0 ? '#dce3e5' : '#e9edef');
+    }
+  } else {
+    for (let x = WORLD.xmin; x <= WORLD.xmax; x += .5) {
+      const px = worldToPixel(x, 0, width, height).x;
+      gridLine(context, px, 0, px, height, Number.isInteger(x) ? '#dce3e5' : '#e9edef');
+    }
   }
   for (let y = WORLD.ymin; y <= WORLD.ymax; y += .5) {
     const py = worldToPixel(0, y, width, height).y;
@@ -250,7 +277,11 @@ function renderGrid(context = ctx, width = state.width, height = state.height) {
   gridLine(context, 0, zero.y, width, zero.y, '#8290a0', 1.6);
   context.font = '10px DM Mono, monospace';context.fillStyle = '#8b99a8';
   context.textAlign = 'center';
-  for (const x of [-4,-2,2,4]) context.fillText(String(x), worldToPixel(x, 0, width, height).x, zero.y + 16);
+  if (state.axisMode === 'pi') {
+    for (const tick of piTicks()) context.fillText(tick.label, worldToPixel(tick.x, 0, width, height).x, zero.y + 16);
+  } else {
+    for (const x of [-4,-2,2,4]) context.fillText(String(x), worldToPixel(x, 0, width, height).x, zero.y + 16);
+  }
   context.textAlign = 'right';
   for (const y of [-3,-2,-1,1,2,3]) context.fillText(String(y), zero.x - 8, worldToPixel(0, y, width, height).y + 3);
   context.fillStyle = '#607084';context.fillText('0', zero.x - 7, zero.y + 16);
@@ -359,6 +390,7 @@ function selectArchiveRound(index) {
   state.archiveRoundIndex = index;
   state.visiblePlayers = new Set(round.drawings.map(player => player.id));
   state.currentLevel = levelFromSpec(round.levelSpec);
+  setAxisMode(defaultAxisMode(state.currentLevel));
   state.revealed = true; state.revealing = false;
   $('roundLabel').textContent = `${tr('SFIDA', 'ROUND')} ${index + 1} / ${state.room.roundCount}`;
   $('levelName').textContent = levelName(state.currentLevel);
@@ -946,6 +978,7 @@ $('leaveRoomBtn').addEventListener('click', () => { leaveRoom(); setMode('journe
 
 function refreshLanguage() {
   applyStaticLanguage();
+  setAxisMode(state.axisMode);
   $('modeDescription').textContent = state.mode === 'journey'
     ? tr('20 curve nuove a ogni percorso, da facile a folle.', '20 new curves each journey, from easy to wild.')
     : state.mode === 'practice' ? tr('Scegli una difficoltà: ogni giro porta curve nuove.', 'Pick a difficulty. Every run brings new curves.')
@@ -993,6 +1026,8 @@ $('languageButton').addEventListener('click', () => {
   localStorage.setItem('curvaLocale', locale);
   refreshLanguage();
 });
+
+$('axisModeButton').addEventListener('click', () => setAxisMode(state.axisMode === 'pi' ? 'numbers' : 'pi'));
 
 setInterval(tickRoomClock, 100);
 

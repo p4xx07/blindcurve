@@ -140,8 +140,14 @@ export function scoreDrawing(level, strokes, width, height) {
   const roughnessFactor = Math.exp(-extraVariation / Math.max(500, targetVariation * 1.2));
   const completeness = .47 + .53 * Math.sqrt(coverage);
   const quality = .28 * position + .16 * precision + .37 * slope + .19 * bend;
-  const generalScore = 100 * quality * completeness * turnsFactor * ambiguityFactor * roughnessFactor;
-  if (breakPixels.length >= 3) {
+  let generalScore = 100 * quality * completeness * turnsFactor * ambiguityFactor * roughnessFactor;
+  if (level.tangentScoring) {
+    // Flat guesses can sit near the middle of many tangent branches. Require
+    // some of the target's steep motion within the drawn, continuous segments.
+    const variationRecall = Math.min(1, drawnVariation / Math.max(1, targetVariation * .35));
+    generalScore *= .15 + .85 * variationRecall;
+  }
+  if (level.spikeScoring) {
     // A periodic reset is defined by its spikes. Most samples lie on the low
     // baseline, so ordinary pointwise similarity would reward a flat line.
     const events = breakPixels.filter(x => x > 20 && x < width - 90).map(x => {
